@@ -5,7 +5,7 @@ import { eq } from "drizzle-orm";
 
 export interface CustomRequest extends Request {
   user?: {
-    id: string;
+    sessionId: string;
     userId: string;
     name: string;
     email: string;
@@ -24,7 +24,7 @@ export const sessionMiddleware = async (
 
   const [data] = await db
     .select({
-      id: userSession.id,
+      sessionId: userSession.id,
       userId: userSession.userId,
       name: usersTable.name,
       email: usersTable.email,
@@ -37,12 +37,12 @@ export const sessionMiddleware = async (
     return next();
   }
 
-  if (!data.userId || !data.id) {
+  if (!data.userId || !data.sessionId) {
     return next();
   }
 
   req.user = {
-    id: data.id,
+    sessionId: data.sessionId,
     userId: data.userId,
     name: data.name,
     email: data.email,
