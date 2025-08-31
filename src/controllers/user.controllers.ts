@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import db from "../db/index.ts";
-import { usersTable } from "../db/schema.ts";
+import { userSession, usersTable } from "../db/schema.ts";
 import { eq } from "drizzle-orm";
 import crypto from "node:crypto";
 
@@ -48,8 +48,6 @@ export const registerUser = async (req: Request, res: Response) => {
   }
 };
 
-
-
 export const loginUser = async (req: Request, res: Response) => {
   const { email, password } = req.body;
   if (!email || !password) {
@@ -58,7 +56,10 @@ export const loginUser = async (req: Request, res: Response) => {
   try {
     const [existingUser] = await db
       .select({
+        id: usersTable.id,
         email: usersTable.email,
+        salt: usersTable.salt,
+        password: usersTable.password,
       })
       .from(usersTable)
       .where(eq(usersTable.email, email));
@@ -67,15 +68,53 @@ export const loginUser = async (req: Request, res: Response) => {
       return res.status(400).json({ error: "User does not exists" });
     }
 
-    const userSalt = await db
-      .select({
-        salt: usersTable.salt,
-      })
-      .from(usersTable)
-      .where(eq(usersTable.email, email));
+    const existingSalt = existingUser.salt;
+    const existinHash = existingUser.password;
 
+    const newHash = crypto
+      .createHmac("sha256", existingSalt)
+      .update(password)
+      .digest("hex");
+
+    if (newHash !== existinHash) {
+      return res.status(400).json({ error: "Password is incorrect" });
+    }
+
+    const [session] = await db
+      .insert(userSession)
+      .values({
+        userId: existingUser.id,
+      })
+      .returning({
+        id: userSession.id,
+      });
+
+    return res.status(200).json({ status: "success", sessionId: session.id });
   } catch (error) {
     console.error(error);
     return res.status(500).json({ error: "Internal server error" });
   }
+};
+
+export const currentUser = async (req: Request, res: Response) => {
+  const sessionId = req.headers["session-id"];
+
+  if (!sessionId || Array.isArray(sessionId)) {
+    return res.status(400).json({ error: "You are not logged in" });
+  }
+  const [data] = await db
+    .select({
+      id: userSession.id,
+      userId: userSession.userId,
+      name: usersTable.name,
+      email: usersTable.email,
+    })
+    .from(userSession)
+    .rightJoin(usersTable, eq(usersTable.id, userSession.userId))
+    .where(eq(userSession.id, sessionId));
+
+  if (!data) {
+    return res.status(400).json({ error: "You are not logged in" });
+  }
+  return res.status(200).json({ data });
 };
