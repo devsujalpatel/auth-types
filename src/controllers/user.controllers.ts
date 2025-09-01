@@ -103,24 +103,28 @@ export const currentUser = async (req: CustomRequest, res: Response) => {
     return res.status(400).json({ error: "You are not logged in" });
   }
 
-  //   const sessionId = req.headers["session-id"];
-
-  //   if (!sessionId || Array.isArray(sessionId)) {
-  //     return res.status(400).json({ error: "You are not logged in" });
-  //   }
-  //   const [data] = await db
-  //     .select({
-  //       id: userSession.id,
-  //       userId: userSession.userId,
-  //       name: usersTable.name,
-  //       email: usersTable.email,
-  //     })
-  //     .from(userSession)
-  //     .rightJoin(usersTable, eq(usersTable.id, userSession.userId))
-  //     .where(eq(userSession.id, sessionId));
-
-  //   if (!data) {
-  //     return res.status(400).json({ error: "You are not logged in" });
-  //   }
   return res.status(200).json({ user });
+};
+
+export const updateUser = async (req: CustomRequest, res: Response) => {
+  const user = req.user;
+  if (!user) {
+    return res.status(400).json({ error: "You are not logged in" });
+  }
+
+  const { name } = req.body;
+
+  const [result] = await db
+    .update(usersTable)
+    .set({
+      name,
+    })
+    .where(eq(usersTable.id, user.userId))
+    .returning({
+      id: usersTable.id,
+      name: usersTable.name,
+      email: usersTable.email,
+    });
+
+  return res.status(200).json({ result });
 };
