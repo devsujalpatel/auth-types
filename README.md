@@ -1,1 +1,1 @@
-# Session Based Authentication and Stateless Authentication Demo
+# Auth Check with jwt and session based
