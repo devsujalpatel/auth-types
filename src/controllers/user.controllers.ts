@@ -3,7 +3,7 @@ import db from "../db/index.ts";
 import { usersTable } from "../db/schema.ts";
 import { eq } from "drizzle-orm";
 import crypto from "node:crypto";
-import { CustomRequest } from "../middlewares/session.middleware.ts";
+import { CustomRequest } from "../middlewares/auth.middleware.ts";
 import jwt from "jsonwebtoken";
 
 export const registerUser = async (req: Request, res: Response) => {
@@ -61,6 +61,7 @@ export const loginUser = async (req: Request, res: Response) => {
         id: usersTable.id,
         email: usersTable.email,
         salt: usersTable.salt,
+        role: usersTable.role,
         password: usersTable.password,
         name: usersTable.name,
       })
@@ -83,20 +84,11 @@ export const loginUser = async (req: Request, res: Response) => {
       return res.status(400).json({ error: "Password is incorrect" });
     }
 
-    // Session Creation
-    // const [session] = await db
-    //   .insert(userSession)
-    //   .values({
-    //     userId: existingUser.id,
-    //   })
-    //   .returning({
-    //     id: userSession.id,
-    //   });
-
     const payload = {
       id: existingUser.id,
       email: existingUser.email,
       name: existingUser.name,
+      role: existingUser.role,
     };
 
     const token = jwt.sign(payload, process.env.JWT_SECRET!, {
@@ -112,29 +104,23 @@ export const loginUser = async (req: Request, res: Response) => {
 
 export const currentUser = async (req: CustomRequest, res: Response) => {
   const user = req.user;
-  if (!user) {
-    return res.status(400).json({ error: "You are not logged in" });
-  }
 
   return res.status(200).json({ user });
 };
 
 export const updateUser = async (req: CustomRequest, res: Response) => {
-  // const user = req.user;
-  // if (!user) {
-  //   return res.status(400).json({ error: "You are not logged in" });
-  // }
+  const user = req.user;
   // const { name } = req.body;
   // const [result] = await db
   //   .update(usersTable)
   //   .set({
   //     name,
   //   })
-  //   .where(eq(usersTable.id, user.userId))
+  //   .where(eq(usersTable.id, user.id))
   //   .returning({
   //     id: usersTable.id,
   //     name: usersTable.name,
   //     email: usersTable.email,
   //   });
-  // return res.status(200).json({ result });
+  return res.status(200).json({ user });
 };
