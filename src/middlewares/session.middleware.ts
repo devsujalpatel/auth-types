@@ -1,15 +1,8 @@
 import { NextFunction, Request, Response } from "express";
-import { userSession, usersTable } from "../db/schema.ts";
-import db from "../db/index.ts";
-import { eq } from "drizzle-orm";
+import jwt, { JwtPayload } from "jsonwebtoken";
 
 export interface CustomRequest extends Request {
-  user?: {
-    sessionId: string;
-    userId: string;
-    name: string;
-    email: string;
-  };
+  user?: string | JwtPayload;
 }
 
 export const sessionMiddleware = async (
@@ -17,36 +10,27 @@ export const sessionMiddleware = async (
   res: Response,
   next: NextFunction
 ) => {
-  const sessionId = req.headers["session-id"];
-  if (!sessionId || Array.isArray(sessionId)) {
+  const tokenHeader = req.headers["authorization"];
+
+  if (!tokenHeader) {
     return next();
   }
 
-  const [data] = await db
-    .select({
-      sessionId: userSession.id,
-      userId: userSession.userId,
-      name: usersTable.name,
-      email: usersTable.email,
-    })
-    .from(userSession)
-    .rightJoin(usersTable, eq(usersTable.id, userSession.userId))
-    .where(eq(userSession.id, sessionId));
-
-  if (!data) {
-    return next();
+  if (!tokenHeader.startsWith("Bearer ")) {
+    return res.status(400).json({ error: "Token must start with Bearer" });
   }
 
-  if (!data.userId || !data.sessionId) {
-    return next();
-  }
+  const token = tokenHeader.split(" ")[1];
 
-  req.user = {
-    sessionId: data.sessionId,
-    userId: data.userId,
-    name: data.name,
-    email: data.email,
-  };
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as string | JwtPayload;
+
+    if (decoded) {
+      req.user = decoded; // now types line up
+    }
+  } catch (err) {
+    return res.status(401).json({ error: "Invalid or expired token" });
+  }
 
   next();
 };

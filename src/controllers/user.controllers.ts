@@ -1,9 +1,10 @@
 import { Request, Response } from "express";
 import db from "../db/index.ts";
-import { userSession, usersTable } from "../db/schema.ts";
+import { usersTable } from "../db/schema.ts";
 import { eq } from "drizzle-orm";
 import crypto from "node:crypto";
 import { CustomRequest } from "../middlewares/session.middleware.ts";
+import jwt from "jsonwebtoken";
 
 export const registerUser = async (req: Request, res: Response) => {
   const { name, email, password } = req.body;
@@ -61,6 +62,7 @@ export const loginUser = async (req: Request, res: Response) => {
         email: usersTable.email,
         salt: usersTable.salt,
         password: usersTable.password,
+        name: usersTable.name,
       })
       .from(usersTable)
       .where(eq(usersTable.email, email));
@@ -81,16 +83,27 @@ export const loginUser = async (req: Request, res: Response) => {
       return res.status(400).json({ error: "Password is incorrect" });
     }
 
-    const [session] = await db
-      .insert(userSession)
-      .values({
-        userId: existingUser.id,
-      })
-      .returning({
-        id: userSession.id,
-      });
+    // Session Creation
+    // const [session] = await db
+    //   .insert(userSession)
+    //   .values({
+    //     userId: existingUser.id,
+    //   })
+    //   .returning({
+    //     id: userSession.id,
+    //   });
 
-    return res.status(200).json({ status: "success", sessionId: session.id });
+    const payload = {
+      id: existingUser.id,
+      email: existingUser.email,
+      name: existingUser.name,
+    };
+
+    const token = jwt.sign(payload, process.env.JWT_SECRET!, {
+      expiresIn: "1d",
+    });
+
+    return res.status(200).json({ status: "success", token });
   } catch (error) {
     console.error(error);
     return res.status(500).json({ error: "Internal server error" });
@@ -107,24 +120,21 @@ export const currentUser = async (req: CustomRequest, res: Response) => {
 };
 
 export const updateUser = async (req: CustomRequest, res: Response) => {
-  const user = req.user;
-  if (!user) {
-    return res.status(400).json({ error: "You are not logged in" });
-  }
-
-  const { name } = req.body;
-
-  const [result] = await db
-    .update(usersTable)
-    .set({
-      name,
-    })
-    .where(eq(usersTable.id, user.userId))
-    .returning({
-      id: usersTable.id,
-      name: usersTable.name,
-      email: usersTable.email,
-    });
-
-  return res.status(200).json({ result });
+  // const user = req.user;
+  // if (!user) {
+  //   return res.status(400).json({ error: "You are not logged in" });
+  // }
+  // const { name } = req.body;
+  // const [result] = await db
+  //   .update(usersTable)
+  //   .set({
+  //     name,
+  //   })
+  //   .where(eq(usersTable.id, user.userId))
+  //   .returning({
+  //     id: usersTable.id,
+  //     name: usersTable.name,
+  //     email: usersTable.email,
+  //   });
+  // return res.status(200).json({ result });
 };
